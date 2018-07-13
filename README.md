@@ -1,3 +1,3 @@
 # AutoROI
 PWS auto ROI drawing code
-Based on this paper: U-Net: Convolutional Networks for Biomedical Image Segmentation
+Based on the paper "U-Net: Convolutional Networks for Biomedical Image Segmentation" by Olaf Ronneberger, Philipp Fischer, Thomas Brox
