@@ -4,27 +4,28 @@ IMG_HEIGHT = 512
 IMG_CHANNELS = 2
 model_path=r'D:\ML\pws_seg\pws_v4.h5'
 seed = 42
+mainDir = r'C:\Users\Nick\Desktop\Org\Xiang segmentation'
 trainingDirectory = [		
-			(r'F:\2018\4-7-18 boston new\w1',10),
-			(r'F:\2018\4-7-18 boston new\w2',10),
-			(r'F:\2018\4-7-18 boston new\w3',10),
-			(r'F:\2018\4-7-18 boston new\w4',10),
-			(r'F:\2018\4-7-18 boston new\w5',10),
-			(r'F:\2018\4-7-18 boston new\w6',10),
+			(mainDir + r'\4-7-18 boston new\w1',10),
+			(mainDir + r'\4-7-18 boston new\w2',10),
+			(mainDir + r'\4-7-18 boston new\w3',10),
+			(mainDir + r'\4-7-18 boston new\w4',10),
+			(mainDir + r'\4-7-18 boston new\w5',10),
+			(mainDir + r'\4-7-18 boston new\w6',10),
 				
-			(r'F:\2018\4-11-18\w1',10),
-			(r'F:\2018\4-11-18\w2',10),
-			(r'F:\2018\4-11-18\w3',10),
-			(r'F:\2018\4-11-18\w4',10),
-			(r'F:\2018\4-11-18\w5',10),
-			(r'F:\2018\4-11-18\w6',10),
+			(mainDir + r'\4-11-18\w1',10),
+			(mainDir + r'\4-11-18\w2',10),
+			(mainDir + r'\4-11-18\w3',10),
+			(mainDir + r'\4-11-18\w4',10),
+			(mainDir + r'\4-11-18\w5',10),
+			(mainDir + r'\4-11-18\w6',10),
 			
-			(r'F:\2018\4-19-18\w1',10),
-			(r'F:\2018\4-19-18\w2',10),
-			(r'F:\2018\4-19-18\w3',10),
-			(r'F:\2018\4-19-18\w4',10),
-			(r'F:\2018\4-19-18\w5',10),
-			(r'F:\2018\4-19-18\w6',10),
+			(mainDir + r'\4-19-18\w1',10),
+			(mainDir + r'\4-19-18\w2',10),
+			(mainDir + r'\4-19-18\w3',10),
+			(mainDir + r'\4-19-18\w4',10),
+			(mainDir + r'\4-19-18\w5',10),
+			(mainDir + r'\4-19-18\w6',10),
             ]
 '''****************'''
 
@@ -49,8 +50,8 @@ warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Fil
 random.seed(seed)   #Set the seed so we can reproduce our results.
 
 def rotate_images(X_imgs,IMG_CHANNELS):
-    '''Given a list of images this function will return an array of images that have been rotated at 90,180, and 270 degrees.'''
-    assert isinstance(X_imgs,list)
+    '''Given an array of images this function will return an array of images that have been rotated at 90,180, and 270 degrees.'''
+    assert isinstance(X_imgs,np.ndarray)
     assert isinstance(IMG_CHANNELS,int)
     X_rotate = []   # list to hold each of the rotated images.
     tf.reset_default_graph()
@@ -68,8 +69,9 @@ def rotate_images(X_imgs,IMG_CHANNELS):
 
 def flip_images(X_imgs,IMG_CHANNELS):
     '''Given a list of images this function will return an array of image that
-    have been flipped vertically,horizontally, and diagonally.'''
-    assert isinstance(X_imgs,list)
+    have been flipped vertically,horizontally, and diagonally.
+    The array should be of shape (n,Height,Width,Channels) where n is the number of images.'''
+    assert isinstance(X_imgs,np.ndarray)
     assert isinstance(IMG_CHANNELS,int)
     X_flip = [] #A list to store the flipped images.
     tf.reset_default_graph()
