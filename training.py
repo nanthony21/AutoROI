@@ -1,40 +1,36 @@
+''' USER PARAMETERS'''
+IMG_WIDTH = 512
+IMG_HEIGHT = 512
+IMG_CHANNELS = 2
+model_path=r'D:\ML\pws_seg\pws_v4.h5'
+seed = 42
+'''****************'''
+
 import os
 import sys
 import random
 import warnings
-
 import numpy as np
-
 import matplotlib.pyplot as plt
-
 from skimage.io import imread, imshow
 from skimage.transform import resize
-
 import tensorflow as tf
-
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.python.keras import backend as K
-
 K.set_session
-
 import re
 import scipy.io as sio
 
 import paths
 dir = paths.training
 
-# Set some parameters
-IMG_WIDTH = 512
-IMG_HEIGHT = 512
-IMG_CHANNELS = 2
-model_path=r'D:\ML\pws_seg\pws_v3.h5'
+
 
 warnings.filterwarnings('ignore', category=UserWarning, module='skimage')
-seed = 42
-random.seed = seed
-np.random.seed = seed
+
+random.seed(seed)
 
 def rotate_images(X_imgs,IMG_CHANNELS):
     X_rotate = []
