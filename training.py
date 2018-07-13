@@ -4,28 +4,21 @@ import random
 import warnings
 
 import numpy as np
-import pandas as pd
 
 import matplotlib.pyplot as plt
 
-from tqdm import tqdm
-from itertools import chain
-from skimage.io import imread, imshow, imread_collection, concatenate_images
+from skimage.io import imread, imshow
 from skimage.transform import resize
-from skimage.morphology import label
 
 import tensorflow as tf
 
-from keras.models import Model, load_model
-from keras.layers import Input
-from keras.layers.core import Lambda
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.layers.pooling import MaxPooling2D
-from keras.layers.merge import concatenate
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras import backend as K
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.python.keras import backend as K
 
 K.set_session
+
 import re
 import scipy.io as sio
 

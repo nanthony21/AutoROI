@@ -1,28 +1,12 @@
-import os, sys,random,re,cv2
-
+import os,cv2
 import numpy as np
-import pandas as pd
-
 import matplotlib.pyplot as plt
-
-from tqdm import tqdm
-from itertools import chain
-from skimage.io import imread, imshow, imread_collection, concatenate_images
+from skimage.io import imread
 from skimage.transform import resize
-from skimage.morphology import label
 from skimage import measure
-
 import tensorflow as tf
-
-from keras.models import Model, load_model
-from keras.layers import Input
-from keras.layers.core import Lambda
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.layers.pooling import MaxPooling2D
-from keras.layers.merge import concatenate
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras import backend as K
-
+from tensorflow.python.keras.models import load_model
+from tensorflow.python.keras import backend as K
 import scipy.io as sio
 
 def mean_iou(y_true, y_pred):
