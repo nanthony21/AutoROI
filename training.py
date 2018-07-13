@@ -4,10 +4,31 @@ IMG_HEIGHT = 512
 IMG_CHANNELS = 2
 model_path=r'D:\ML\pws_seg\pws_v4.h5'
 seed = 42
+trainingDirectory = [		
+			(r'F:\2018\4-7-18 boston new\w1',10),
+			(r'F:\2018\4-7-18 boston new\w2',10),
+			(r'F:\2018\4-7-18 boston new\w3',10),
+			(r'F:\2018\4-7-18 boston new\w4',10),
+			(r'F:\2018\4-7-18 boston new\w5',10),
+			(r'F:\2018\4-7-18 boston new\w6',10),
+				
+			(r'F:\2018\4-11-18\w1',10),
+			(r'F:\2018\4-11-18\w2',10),
+			(r'F:\2018\4-11-18\w3',10),
+			(r'F:\2018\4-11-18\w4',10),
+			(r'F:\2018\4-11-18\w5',10),
+			(r'F:\2018\4-11-18\w6',10),
+			
+			(r'F:\2018\4-19-18\w1',10),
+			(r'F:\2018\4-19-18\w2',10),
+			(r'F:\2018\4-19-18\w3',10),
+			(r'F:\2018\4-19-18\w4',10),
+			(r'F:\2018\4-19-18\w5',10),
+			(r'F:\2018\4-19-18\w6',10),
+            ]
 '''****************'''
 
 import os
-import sys
 import random
 import warnings
 import numpy as np
@@ -18,38 +39,39 @@ import tensorflow as tf
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.python.keras import backend as K
-K.set_session
 import re
 import scipy.io as sio
-
-import paths
-dir = paths.training
+from autoROIFuncs import meanIOU
 
 
+warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Filter out unwanted warnings.
 
-warnings.filterwarnings('ignore', category=UserWarning, module='skimage')
-
-random.seed(seed)
+random.seed(seed)   #Set the seed so we can reproduce our results.
 
 def rotate_images(X_imgs,IMG_CHANNELS):
-    X_rotate = []
+    '''Given a list of images this function will return an array of images that have been rotated at 90,180, and 270 degrees.'''
+    assert isinstance(X_imgs,list)
+    assert isinstance(IMG_CHANNELS,int)
+    X_rotate = []   # list to hold each of the rotated images.
     tf.reset_default_graph()
     X = tf.placeholder(tf.float32, shape = (IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS))
     k = tf.placeholder(tf.int32)
     tf_img = tf.image.rot90(X, k = k)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for img in X_imgs:
+        for img in X_imgs:  #Loop through each image.
             for i in range(3):  # Rotation at 90, 180 and 270 degrees
                 rotated_img = sess.run(tf_img, feed_dict = {X: img, k: i + 1})
-                X_rotate.append(rotated_img)
-        
-    X_rotate = np.array(X_rotate, dtype = np.float32)
+                X_rotate.append(rotated_img)     
+    X_rotate = np.array(X_rotate, dtype = np.float32) #convert to numpy array and return.
     return X_rotate
 
 def flip_images(X_imgs,IMG_CHANNELS):
-    X_flip = []
+    '''Given a list of images this function will return an array of image that
+    have been flipped vertically,horizontally, and diagonally.'''
+    assert isinstance(X_imgs,list)
+    assert isinstance(IMG_CHANNELS,int)
+    X_flip = [] #A list to store the flipped images.
     tf.reset_default_graph()
     X = tf.placeholder(tf.float32, shape = (IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS))
     tf_img1 = tf.image.flip_left_right(X)
@@ -63,17 +85,14 @@ def flip_images(X_imgs,IMG_CHANNELS):
     X_flip = np.array(X_flip, dtype = np.float32)
     return X_flip
 	
-fov_count = 0
-for i in dir:
-	fov_count+=i[1]
+fov_count = sum([i[1] for i in trainingDirectory])
 
 # Get and resize train images and masks
 X_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,IMG_CHANNELS), dtype=np.uint8)
 Y_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
 print('Getting and resizing train images and masks ... ')
-sys.stdout.flush()
-n=0
-for path in dir:
+
+for n, path in enumerate(trainingDirectory):
 	cellcount=range(1,path[1]+1)
 	print (path[0],'cell number = ',path[1])
 	for cell in cellcount:
@@ -108,6 +127,8 @@ for path in dir:
 			Y_train[n] = mask
 			n+=1
 
+'''We want our trained model to be unaffected by image rotation.
+In order to expand our training dataset we rotate and flip each image and add the modified images to our dataset.'''
 X_train_rotated = rotate_images(X_train,2)
 Y_train_rotated = rotate_images(Y_train,1)
 X_train_flipped = flip_images(X_train,2)
@@ -123,17 +144,6 @@ plt.show()
 imshow(np.squeeze(Y_train[ix]))
 plt.show()
 
-# IoU metric
-def mean_iou(y_true, y_pred):
-    prec = []
-    for t in np.arange(0.5, 1.0, 0.05):
-        y_pred_ = tf.to_int32(y_pred > t)
-        score, up_opt = tf.metrics.mean_iou(y_true, y_pred_, 2)
-        K.get_session().run(tf.local_variables_initializer())
-        with tf.control_dependencies([up_opt]):
-            score = tf.identity(score)
-        prec.append(score)
-    return K.mean(K.stack(prec), axis=0)
 	
 # U-Net model
 inputs = Input((IMG_HEIGHT, IMG_WIDTH,IMG_CHANNELS))
@@ -181,7 +191,7 @@ c9 = Conv2D(8, (3, 3), activation='relu', padding='same') (c9)
 outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
 
 model = Model(inputs=[inputs], outputs=[outputs])
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[mean_iou])
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[meanIOU])
 model.summary()
 
 # Fit model
