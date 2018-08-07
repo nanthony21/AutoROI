@@ -9,6 +9,7 @@ import tensorflow as tf
 from tensorflow.python.keras import backend
 
 def meanIOU(y_true, y_pred):
+    #Calculates the "Intersection over union" it is essentially the merit function for our neural net.
     prec = []
     for t in np.arange(0.5, 1.0, 0.05):
         y_pred_ = tf.to_int32(y_pred > t)

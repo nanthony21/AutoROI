@@ -2,36 +2,34 @@
 IMG_WIDTH = 512
 IMG_HEIGHT = 512
 IMG_CHANNELS = 2
-model_path=r'D:\ML\pws_seg\pws_v4.h5'
-seed = 42
+model_path=r'C:\Users\Nick\Desktop\Org\pws_v4.h5'
+seed = 3
 mainDir = r'C:\Users\Nick\Desktop\Org\Xiang segmentation'
 trainingDirectory = [		
-			(mainDir + r'\4-7-18 boston new\w1',10),
-			(mainDir + r'\4-7-18 boston new\w2',10),
-			(mainDir + r'\4-7-18 boston new\w3',10),
-			(mainDir + r'\4-7-18 boston new\w4',10),
-			(mainDir + r'\4-7-18 boston new\w5',10),
-			(mainDir + r'\4-7-18 boston new\w6',10),
+			mainDir + r'\4-7-18 boston new\w1',
+			mainDir + r'\4-7-18 boston new\w2',
+			mainDir + r'\4-7-18 boston new\w3',
+			mainDir + r'\4-7-18 boston new\w4',
+			mainDir + r'\4-7-18 boston new\w5',
+			mainDir + r'\4-7-18 boston new\w6',
 				
-			(mainDir + r'\4-11-18\w1',10),
-			(mainDir + r'\4-11-18\w2',10),
-			(mainDir + r'\4-11-18\w3',10),
-			(mainDir + r'\4-11-18\w4',10),
-			(mainDir + r'\4-11-18\w5',10),
-			(mainDir + r'\4-11-18\w6',10),
+			mainDir + r'\4-11-18\w1',
+			mainDir + r'\4-11-18\w2',
+			mainDir + r'\4-11-18\w3',
+			mainDir + r'\4-11-18\w4',
+			mainDir + r'\4-11-18\w5',
+			mainDir + r'\4-11-18\w6',
 			
-			(mainDir + r'\4-19-18\w1',10),
-			(mainDir + r'\4-19-18\w2',10),
-			(mainDir + r'\4-19-18\w3',10),
-			(mainDir + r'\4-19-18\w4',10),
-			(mainDir + r'\4-19-18\w5',10),
-			(mainDir + r'\4-19-18\w6',10),
+			mainDir + r'\4-19-18\w1',
+			mainDir + r'\4-19-18\w2',
+			mainDir + r'\4-19-18\w3',
+			mainDir + r'\4-19-18\w4',
+			mainDir + r'\4-19-18\w5',
+			mainDir + r'\4-19-18\w6',
             ]
 '''****************'''
 
-import os
-import random
-import warnings
+import os, time, random, warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.io import imread, imshow
@@ -42,6 +40,7 @@ from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspos
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
 import re
 import scipy.io as sio
+from glob import glob
 from autoROIFuncs import meanIOU
 
 
@@ -95,20 +94,18 @@ Y_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
 print('Getting and resizing train images and masks ... ')
 
 for n, path in enumerate(trainingDirectory):
-	cellcount=range(1,path[1]+1)
-	print (path[0],'cell number = ',path[1])
-	for cell in cellcount:
-		FOV = path[0]+'\Cell'+str(cell)
-		if os.path.isdir(FOV):
+	paths = glob(os.path.join(path,'Cell*\\')) #Get the paths to each cell folder
+	for folder in paths:
+		if os.path.isdir(folder):
 			regex=re.compile(r'BW(\d+)_')
-			BW_list= filter(regex.match,os.listdir(FOV))
+			BW_list= filter(regex.match,os.listdir(folder))
 			BW_num=[int(re.findall(regex,a)[0]) for a in BW_list]
 			max_BW_num = np.max(BW_num)
 			
 			# load bd_image
-			image_bd = imread(FOV+'\image_bd.tif')
+			image_bd = imread(folder + '\image_bd.tif')
 			image_bd =(255.0/image_bd.max())*image_bd  
-			rms = sio.loadmat(FOV+'\p0_Rms.mat')
+			rms = sio.loadmat(folder + '\p0_Rms.mat')
 			rms = rms['cubeRms']
 			rms *= 255.0/rms.max()  
 			image_stack=np.stack((rms,image_bd), -1)
@@ -118,8 +115,8 @@ for n, path in enumerate(trainingDirectory):
 			mask = np.zeros((IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
 
 			for BW in range(1,max_BW_num+1):
-				if os.path.isfile(FOV+'\BW'+str(BW)+'_nuc.mat'):
-					mask_ = sio.loadmat(FOV+'\BW'+str(BW)+'_nuc.mat')
+				if os.path.isfile(folder+'\BW'+str(BW)+'_nuc.mat'):
+					mask_ = sio.loadmat(folder+'\BW'+str(BW)+'_nuc.mat')
 					mask_ = mask_['BW'][:,:]	
 					
 					mask_=np.stack((mask_,)*1, -1)
@@ -149,11 +146,17 @@ plt.show()
 	
 # U-Net model
 inputs = Input((IMG_HEIGHT, IMG_WIDTH,IMG_CHANNELS))
-s = Lambda(lambda x: x / 255) (inputs)
+s = Lambda(lambda x: x / 255) (inputs)  #Normalize 8-bit values to 1.
 
+'''
+Right now we are using 4 times fewer convolution kernels than shown in the paper.
+We are also using a different pooling strategy.
+'''
+
+'''Contracting part of the U'''
 c1 = Conv2D(8, (3, 3), activation='relu', padding='same') (s)
 c1 = Conv2D(8, (3, 3), activation='relu', padding='same') (c1)
-p1 = MaxPooling2D((2, 2)) (c1)
+p1 = MaxPooling2D((2, 2)) (c1)  #Downsample by a factor of 2.
 
 c2 = Conv2D(16, (3, 3), activation='relu', padding='same') (p1)
 c2 = Conv2D(16, (3, 3), activation='relu', padding='same') (c2)
@@ -166,12 +169,12 @@ p3 = MaxPooling2D((2, 2)) (c3)
 c4 = Conv2D(64, (3, 3), activation='relu', padding='same') (p3)
 c4 = Conv2D(64, (3, 3), activation='relu', padding='same') (c4)
 p4 = MaxPooling2D(pool_size=(2, 2)) (c4)
-
+'''Bottom of the U'''
 c5 = Conv2D(128, (3, 3), activation='relu', padding='same') (p4)
 c5 = Conv2D(128, (3, 3), activation='relu', padding='same') (c5)
-
-u6 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same') (c5)
-u6 = concatenate([u6, c4])
+'''Expanding part of the U'''
+u6 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same') (c5) #This is basically an up-sampling convolution
+u6 = concatenate([u6, c4])  #We then concat with the last tensor from the same level of the U in order to get our new tensor.
 c6 = Conv2D(64, (3, 3), activation='relu', padding='same') (u6)
 c6 = Conv2D(64, (3, 3), activation='relu', padding='same') (c6)
 
@@ -190,7 +193,7 @@ u9 = concatenate([u9, c1], axis=3)
 c9 = Conv2D(8, (3, 3), activation='relu', padding='same') (u9)
 c9 = Conv2D(8, (3, 3), activation='relu', padding='same') (c9)
 
-outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
+outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)  #This final layer condensers the tensor down to only have 1 channel since we only have one output class.
 
 model = Model(inputs=[inputs], outputs=[outputs])
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[meanIOU])
@@ -199,5 +202,7 @@ model.summary()
 # Fit model
 earlystopper = EarlyStopping(patience=5, verbose=1)
 checkpointer = ModelCheckpoint(model_path, verbose=1, save_best_only=True)
+startTime = time.time()
 results = model.fit(X_train, Y_train, validation_split=0.1, batch_size=8, epochs=30, 
                     callbacks=[earlystopper, checkpointer])
+print("Completed in {} seconds.".format(time.time()-startTime))
