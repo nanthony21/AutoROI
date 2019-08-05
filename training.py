@@ -193,7 +193,7 @@ u9 = concatenate([u9, c1], axis=3)
 c9 = Conv2D(8, (3, 3), activation='relu', padding='same') (u9)
 c9 = Conv2D(8, (3, 3), activation='relu', padding='same') (c9)
 
-outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)  #This final layer condensers the tensor down to only have 1 channel since we only have one output class.
+outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)  #This final layer condenses the tensor down to only have 1 channel since we only have one output class.
 
 model = Model(inputs=[inputs], outputs=[outputs])
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[meanIOU])
