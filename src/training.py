@@ -47,7 +47,6 @@ warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Fil
 
 random.seed(seed)   #Set the seed so we can reproduce our results.
 
-	
 fov_count = sum([i[1] for i in trainingDirectory])
 
 # Get and resize train images and masks
@@ -65,17 +64,13 @@ for path in trainingDirectory:
 			rms = acq.pws.loadAnalysis('p0').rms
 			rms *= 255.0/rms.max()  
 			image_stack = np.stack((rms,image_bd), -1)
-			image_stack = resize(image_stack, (IMG_WIDTH,IMG_HEIGHT, IMG_CHANNELS), mode='constant', preserve_range=True) #TODO what is this
 			X_train[n] = image_stack
 			
-			mask = np.zeros((IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
-
+			mask = None
 			for roiName, roiNum, fileFormat in acq.getRois():
 				if roiName == 'nuc':
 					roi = acq.loadRoi(roiName, roiNum, fileFormat)
-					mask_ = np.stack((roi.mask,)*1, -1) #TODO what is this
-					mask_ = resize(mask_, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
-					mask = np.maximum(mask, mask_) #TODO is this just an OR statement?
+					mask = roi.mask if mask is None else np.logical_or(mask, roi.mask)
 			Y_train[n] = mask
 			n += 1
 
