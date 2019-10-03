@@ -33,9 +33,9 @@ import matplotlib.pyplot as plt
 from skimage.io import imread, imshow
 from skimage.transform import resize
 import tensorflow as tf
-from tensorflow.python.keras.models import Model
+import tensorflow.python.keras.models as tfModels
 from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
-from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
+import tensorflow.python.keras.callbacks as tfCallbacks
 import re
 import scipy.io as sio
 from glob import glob
@@ -148,13 +148,13 @@ c9 = Conv2D(8, (3, 3), activation='relu', padding='same') (c9)
 
 outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)  #This final layer condenses the tensor down to only have 1 channel since we only have one output class.
 
-model = Model(inputs=[inputs], outputs=[outputs])
+model = tfModels.Model(inputs=[inputs], outputs=[outputs])
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[meanIOU])
 model.summary()
 
 # Fit model
-earlystopper = EarlyStopping(patience=5, verbose=1)
-checkpointer = ModelCheckpoint(model_path, verbose=1, save_best_only=True)
+earlystopper = tfCallbacks.EarlyStopping(patience=5, verbose=1)
+checkpointer = tfCallbacks.ModelCheckpoint(model_path, verbose=1, save_best_only=True)
 startTime = time.time()
 results = model.fit(X_train, Y_train, validation_split=0.1, batch_size=8, epochs=30, 
                     callbacks=[earlystopper, checkpointer])
