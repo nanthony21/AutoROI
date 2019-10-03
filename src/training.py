@@ -1,6 +1,4 @@
 ''' USER PARAMETERS'''
-IMG_WIDTH = 512
-IMG_HEIGHT = 512
 IMG_CHANNELS = 2
 model_path=r'C:\Users\Nick\Desktop\Org\pws_v4.h5'
 seed = 3
@@ -42,6 +40,7 @@ import re
 import scipy.io as sio
 from glob import glob
 from autoROIFuncs import meanIOU
+from pwspy.dataTypes import AcqDir, ImCube, Roi
 
 
 warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Filter out unwanted warnings.
@@ -50,8 +49,8 @@ random.seed(seed)   #Set the seed so we can reproduce our results.
 
 def rotate_images(X_imgs,IMG_CHANNELS):
     '''Given an array of images this function will return an array of images that have been rotated at 90,180, and 270 degrees.'''
-    assert isinstance(X_imgs,np.ndarray)
-    assert isinstance(IMG_CHANNELS,int)
+    assert isinstance(X_imgs, np.ndarray)
+    assert isinstance(IMG_CHANNELS, int)
     X_rotate = []   # list to hold each of the rotated images.
     tf.reset_default_graph()
     X = tf.placeholder(tf.float32, shape = (IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS))
@@ -70,8 +69,8 @@ def flip_images(X_imgs,IMG_CHANNELS):
     '''Given a list of images this function will return an array of image that
     have been flipped vertically,horizontally, and diagonally.
     The array should be of shape (n,Height,Width,Channels) where n is the number of images.'''
-    assert isinstance(X_imgs,np.ndarray)
-    assert isinstance(IMG_CHANNELS,int)
+    assert isinstance(X_imgs, np.ndarray)
+    assert isinstance(IMG_CHANNELS, int)
     X_flip = [] #A list to store the flipped images.
     tf.reset_default_graph()
     X = tf.placeholder(tf.float32, shape = (IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS))
@@ -93,38 +92,29 @@ X_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,IMG_CHANNELS), dtype=np.uin
 Y_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
 print('Getting and resizing train images and masks ... ')
 
-for n, path in enumerate(trainingDirectory):
-	paths = glob(os.path.join(path,'Cell*\\')) #Get the paths to each cell folder
-	for folder in paths:
-		if os.path.isdir(folder):
-			regex=re.compile(r'BW(\d+)_')
-			BW_list= filter(regex.match,os.listdir(folder))
-			BW_num=[int(re.findall(regex,a)[0]) for a in BW_list]
-			max_BW_num = np.max(BW_num)
-			
+n=0
+for path in trainingDirectory:
+	paths = glob(os.path.join(path, 'Cell*\\')) #Get the paths to each cell folder
+	paths = [AcqDir(path) for path in paths]
+	for acq in paths:
 			# load bd_image
-			image_bd = imread(folder + '\image_bd.tif')
-			image_bd =(255.0/image_bd.max())*image_bd  
-			rms = sio.loadmat(folder + '\p0_Rms.mat')
-			rms = rms['cubeRms']
+			image_bd = acq.pws.getThumbnail()
+			rms = acq.pws.loadAnalysis('p0').rms
 			rms *= 255.0/rms.max()  
-			image_stack=np.stack((rms,image_bd), -1)
-			image_stack= resize(image_stack, (IMG_WIDTH,IMG_HEIGHT, IMG_CHANNELS), mode='constant', preserve_range=True)
+			image_stack = np.stack((rms,image_bd), -1)
+			image_stack = resize(image_stack, (IMG_WIDTH,IMG_HEIGHT, IMG_CHANNELS), mode='constant', preserve_range=True) #TODO what is this
 			X_train[n] = image_stack
 			
 			mask = np.zeros((IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
 
-			for BW in range(1,max_BW_num+1):
-				if os.path.isfile(folder+'\BW'+str(BW)+'_nuc.mat'):
-					mask_ = sio.loadmat(folder+'\BW'+str(BW)+'_nuc.mat')
-					mask_ = mask_['BW'][:,:]	
-					
-					mask_=np.stack((mask_,)*1, -1)
-					mask_ = resize(mask_, (IMG_HEIGHT, IMG_WIDTH), mode='constant', 
-									  preserve_range=True)
-					mask = np.maximum(mask, mask_)
+			for roiName, roiNum, fileFormat in acq.getRois():
+				if roiName == 'nuc':
+					roi = acq.loadRoi(roiName, roiNum, fileFormat)
+					mask_ = np.stack((roi.mask,)*1, -1) #TODO what is this
+					mask_ = resize(mask_, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
+					mask = np.maximum(mask, mask_) #TODO is this just an OR statement?
 			Y_train[n] = mask
-			n+=1
+			n += 1
 
 '''We want our trained model to be unaffected by image rotation.
 In order to expand our training dataset we rotate and flip each image and add the modified images to our dataset.'''
