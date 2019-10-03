@@ -47,43 +47,6 @@ warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Fil
 
 random.seed(seed)   #Set the seed so we can reproduce our results.
 
-def rotate_images(X_imgs,IMG_CHANNELS):
-    '''Given an array of images this function will return an array of images that have been rotated at 90,180, and 270 degrees.'''
-    assert isinstance(X_imgs, np.ndarray)
-    assert isinstance(IMG_CHANNELS, int)
-    X_rotate = []   # list to hold each of the rotated images.
-    tf.reset_default_graph()
-    X = tf.placeholder(tf.float32, shape = (IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS))
-    k = tf.placeholder(tf.int32)
-    tf_img = tf.image.rot90(X, k = k)
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        for img in X_imgs:  #Loop through each image.
-            for i in range(3):  # Rotation at 90, 180 and 270 degrees
-                rotated_img = sess.run(tf_img, feed_dict = {X: img, k: i + 1})
-                X_rotate.append(rotated_img)     
-    X_rotate = np.array(X_rotate, dtype = np.float32) #convert to numpy array and return.
-    return X_rotate
-
-def flip_images(X_imgs,IMG_CHANNELS):
-    '''Given a list of images this function will return an array of image that
-    have been flipped vertically,horizontally, and diagonally.
-    The array should be of shape (n,Height,Width,Channels) where n is the number of images.'''
-    assert isinstance(X_imgs, np.ndarray)
-    assert isinstance(IMG_CHANNELS, int)
-    X_flip = [] #A list to store the flipped images.
-    tf.reset_default_graph()
-    X = tf.placeholder(tf.float32, shape = (IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS))
-    tf_img1 = tf.image.flip_left_right(X)
-    tf_img2 = tf.image.flip_up_down(X)
-    tf_img3 = tf.image.transpose_image(X)
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        for img in X_imgs:
-            flipped_imgs = sess.run([tf_img1, tf_img2, tf_img3], feed_dict = {X: img})
-            X_flip.extend(flipped_imgs)
-    X_flip = np.array(X_flip, dtype = np.float32)
-    return X_flip
 	
 fov_count = sum([i[1] for i in trainingDirectory])
 
@@ -118,10 +81,10 @@ for path in trainingDirectory:
 
 '''We want our trained model to be unaffected by image rotation.
 In order to expand our training dataset we rotate and flip each image and add the modified images to our dataset.'''
-X_train_rotated = rotate_images(X_train,2)
-Y_train_rotated = rotate_images(Y_train,1)
-X_train_flipped = flip_images(X_train,2)
-Y_train_flipped = flip_images(Y_train,1)
+X_train_rotated = [np.rot90(im, rot) for im in X_train for rot in [1, 2, 3]]
+Y_train_rotated = [np.rot90(im, rot) for im in Y_train for rot in [1, 2, 3]]
+X_train_flipped = [np.flip(im, ax) for im in X_train for ax in [0, 1]] + [np.transpose(im, axes=(1, 0, 2)) for im in X_train] #Flip vertically, horizontally, and transpose.
+Y_train_flipped = [np.flip(im, ax) for im in Y_train for ax in [0, 1]] + [np.transpose(im, axes=(1, 0, 2)) for im in Y_train]
 
 X_train = np.concatenate((X_train,X_train_rotated,X_train_flipped), axis=0)
 Y_train = np.concatenate((Y_train,Y_train_rotated,Y_train_flipped), axis=0)
