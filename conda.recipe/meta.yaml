@@ -21,7 +21,7 @@ requirements:
     - numpy >=1.16
     - pwspy
     - h5py
-    - tensorflow
+    - tensorflow-gpu
 
 about:
   home: data['url']
