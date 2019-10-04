@@ -3,41 +3,15 @@ IMG_CHANNELS = 2
 model_path=r'C:\Users\Nick\Desktop\Org\pws_v4.h5'
 seed = 3
 mainDir = r'C:\Users\Nick\Desktop\Org\Xiang segmentation'
-trainingDirectory = [		
-			mainDir + r'\4-7-18 boston new\w1',
-			mainDir + r'\4-7-18 boston new\w2',
-			mainDir + r'\4-7-18 boston new\w3',
-			mainDir + r'\4-7-18 boston new\w4',
-			mainDir + r'\4-7-18 boston new\w5',
-			mainDir + r'\4-7-18 boston new\w6',
-				
-			mainDir + r'\4-11-18\w1',
-			mainDir + r'\4-11-18\w2',
-			mainDir + r'\4-11-18\w3',
-			mainDir + r'\4-11-18\w4',
-			mainDir + r'\4-11-18\w5',
-			mainDir + r'\4-11-18\w6',
-			
-			mainDir + r'\4-19-18\w1',
-			mainDir + r'\4-19-18\w2',
-			mainDir + r'\4-19-18\w3',
-			mainDir + r'\4-19-18\w4',
-			mainDir + r'\4-19-18\w5',
-			mainDir + r'\4-19-18\w6',
-            ]
 '''****************'''
 
 import os, time, random, warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.io import imread, imshow
-from skimage.transform import resize
-import tensorflow as tf
 import tensorflow.python.keras.models as tfModels
 from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 import tensorflow.python.keras.callbacks as tfCallbacks
-import re
-import scipy.io as sio
 from glob import glob
 from autoROIFuncs import meanIOU
 from pwspy.dataTypes import AcqDir, ImCube, Roi
@@ -47,32 +21,29 @@ warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Fil
 
 random.seed(seed)   #Set the seed so we can reproduce our results.
 
-fov_count = sum([i[1] for i in trainingDirectory])
+acqs = [AcqDir(path) for path in glob(os.path.join(mainDir, '**', 'Cell*'), recursive=True)]
+height, width, _ = ImCube.fromMetadata(acqs[0].pws).data.shape
 
 # Get and resize train images and masks
-X_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,IMG_CHANNELS), dtype=np.uint8)
-Y_train = np.zeros((fov_count, IMG_HEIGHT, IMG_WIDTH,1), dtype=np.bool)
+X_train = np.zeros((len(acqs), height, width, 2), dtype=np.uint8)
+Y_train = np.zeros((len(acqs), height, width, 1), dtype=np.bool)
 print('Getting and resizing train images and masks ... ')
 
-n=0
-for path in trainingDirectory:
-	paths = glob(os.path.join(path, 'Cell*\\')) #Get the paths to each cell folder
-	paths = [AcqDir(path) for path in paths]
-	for acq in paths:
-			# load bd_image
-			image_bd = acq.pws.getThumbnail()
-			rms = acq.pws.loadAnalysis('p0').rms
-			rms *= 255.0/rms.max()  
-			image_stack = np.stack((rms,image_bd), -1)
-			X_train[n] = image_stack
-			
-			mask = None
-			for roiName, roiNum, fileFormat in acq.getRois():
-				if roiName == 'nuc':
-					roi = acq.loadRoi(roiName, roiNum, fileFormat)
-					mask = roi.mask if mask is None else np.logical_or(mask, roi.mask)
-			Y_train[n] = mask
-			n += 1
+
+for i, acq in enumerate(acqs):
+		# load bd_image
+		image_bd = acq.pws.getThumbnail()
+		rms = acq.pws.loadAnalysis('p0').rms
+		rms *= 255.0/rms.max()
+		image_stack = np.stack((rms, image_bd), -1)
+		X_train[i, :, :, :] = image_stack
+
+		mask = None
+		for roiName, roiNum, fileFormat in acq.getRois():
+			if roiName == 'nuc':
+				roi = acq.loadRoi(roiName, roiNum, fileFormat)
+				mask = roi.mask if mask is None else np.logical_or(mask, roi.mask)
+		Y_train[i, :, :, :] = mask
 
 '''We want our trained model to be unaffected by image rotation.
 In order to expand our training dataset we rotate and flip each image and add the modified images to our dataset.'''
@@ -93,7 +64,7 @@ plt.show()
 
 	
 # U-Net model
-inputs = Input((IMG_HEIGHT, IMG_WIDTH,IMG_CHANNELS))
+inputs = Input((height, width, 2))
 s = Lambda(lambda x: x / 255) (inputs)  #Normalize 8-bit values to 1.
 
 '''
