@@ -1,27 +1,27 @@
-''' USER PARAMETERS'''
-IMG_CHANNELS = 2
-model_path=r'C:\Users\Nick\Desktop\Org\pws_v4.h5'
-seed = 3
-mainDir = r'C:\Users\Nick\Desktop\Org\Xiang segmentation'
-'''****************'''
-
+#TODO it might be good to use this repo for all the deep learning stuff: https://github.com/NVIDIA/DeepLearningExamples/tree/master/TensorFlow/Segmentation/UNet_Medical
 import os, time, random, warnings
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage.io import imread, imshow
 import tensorflow.python.keras.models as tfModels
 from tensorflow.python.keras.layers import Input, Lambda, Conv2D, Conv2DTranspose, MaxPooling2D, concatenate
 import tensorflow.python.keras.callbacks as tfCallbacks
 from glob import glob
 from autoROIFuncs import meanIOU
 from pwspy.dataTypes import AcqDir, ImCube, Roi
+from pwspy.analysis.pws import LegacyPWSAnalysisResults
+from tensorflow.python.client import device_lib
+import tensorflow as tf
 
+''' USER PARAMETERS'''
+model_path=r'C:\Users\backman05\Documents\Bitbucket\autoroi\models\pws_v4.h5'
+seed = 3
+mainDir = r'C:\Users\backman05\Desktop\Org\Xiang segmentation'
+'''****************'''
 
-warnings.filterwarnings('ignore', category=UserWarning, module='skimage')   #Filter out unwanted warnings.
+devs = device_lib.list_local_devices()
+print(f"Found devices: " + '\n'.join([f"{i.device_type}" for i in devs]))
 
-random.seed(seed)   #Set the seed so we can reproduce our results.
-
-acqs = [AcqDir(path) for path in glob(os.path.join(mainDir, '**', 'Cell*'), recursive=True)]
+acqs = [AcqDir(path) for path in glob(os.path.join(mainDir, '**', 'Cell*'), recursive=True) if os.path.isdir(path)]
 height, width, _ = ImCube.fromMetadata(acqs[0].pws).data.shape
 
 # Get and resize train images and masks
@@ -33,7 +33,14 @@ print('Getting and resizing train images and masks ... ')
 for i, acq in enumerate(acqs):
 		# load bd_image
 		image_bd = acq.pws.getThumbnail()
-		rms = acq.pws.loadAnalysis('p0').rms
+		try:
+			rms = acq.pws.loadAnalysis('p0').rms
+		except OSError: #The analysis file does not exist. it is probably a legacy analysis file.
+			try:
+				rms = LegacyPWSAnalysisResults.load(acq.pws.filePath, 'p0').rms
+			except: #Analysis not present
+				print(f"Skipping {acq.filePath} due to missing analysis results.")
+				continue
 		rms *= 255.0/rms.max()
 		image_stack = np.stack((rms, image_bd), -1)
 		X_train[i, :, :, :] = image_stack
@@ -43,7 +50,7 @@ for i, acq in enumerate(acqs):
 			if roiName == 'nuc':
 				roi = acq.loadRoi(roiName, roiNum, fileFormat)
 				mask = roi.mask if mask is None else np.logical_or(mask, roi.mask)
-		Y_train[i, :, :, :] = mask
+		Y_train[i, :, :, :] = mask[:,:, None]
 
 '''We want our trained model to be unaffected by image rotation.
 In order to expand our training dataset we rotate and flip each image and add the modified images to our dataset.'''
@@ -52,17 +59,16 @@ Y_train_rotated = [np.rot90(im, rot) for im in Y_train for rot in [1, 2, 3]]
 X_train_flipped = [np.flip(im, ax) for im in X_train for ax in [0, 1]] + [np.transpose(im, axes=(1, 0, 2)) for im in X_train] #Flip vertically, horizontally, and transpose.
 Y_train_flipped = [np.flip(im, ax) for im in Y_train for ax in [0, 1]] + [np.transpose(im, axes=(1, 0, 2)) for im in Y_train]
 
-X_train = np.concatenate((X_train,X_train_rotated,X_train_flipped), axis=0)
-Y_train = np.concatenate((Y_train,Y_train_rotated,Y_train_flipped), axis=0)
+X_train = np.concatenate((X_train, X_train_rotated, X_train_flipped), axis=0)
+Y_train = np.concatenate((Y_train, Y_train_rotated, Y_train_flipped), axis=0)
 
 # Check if training data looks all right
 ix = random.randint(0, 60)
-imshow(X_train[ix][:,:,1])
-plt.show()
-imshow(np.squeeze(Y_train[ix]))
+fig = plt.figure()
+plt.imshow(X_train[ix][:, :, 1], cmap='gray')
+plt.imshow(np.squeeze(Y_train[ix]), alpha=.5)
 plt.show()
 
-	
 # U-Net model
 inputs = Input((height, width, 2))
 s = Lambda(lambda x: x / 255) (inputs)  #Normalize 8-bit values to 1.
@@ -120,8 +126,8 @@ model.summary()
 
 # Fit model
 earlystopper = tfCallbacks.EarlyStopping(patience=5, verbose=1)
-checkpointer = tfCallbacks.ModelCheckpoint(model_path, verbose=1, save_best_only=True)
+checkpointer = tfCallbacks.ModelCheckpoint(model_path, verbose=1, save_best_only=True) # saves the model weights after each epoch if the validation loss decreased
+tf.set_random_seed(seed)
 startTime = time.time()
-results = model.fit(X_train, Y_train, validation_split=0.1, batch_size=8, epochs=30, 
-                    callbacks=[earlystopper, checkpointer])
+results = model.fit(X_train, Y_train, validation_split=0.1, batch_size=8, epochs=30, callbacks=[earlystopper, checkpointer])
 print("Completed in {} seconds.".format(time.time()-startTime))
